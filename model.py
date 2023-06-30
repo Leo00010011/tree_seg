@@ -57,5 +57,5 @@ def get_unet():
                   metrics = ['accuracy', acc, jacc_loss, dice_coef, jacc_coef, sensitivity, specificity])
     return model
 
-model = get_unet()
-model.summary()
+#model = get_unet()
+#model.summary()
