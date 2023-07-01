@@ -15,8 +15,331 @@ files.upload()
 
 ! mkdir ~/.kaggle
 
-! cp kaggle.json ~/.kaggle/
+from google.colab import drive
+drive.mount('/content/drive')
+
+!cp /content/drive/MyDrive/kaggle.json ~/.kaggle
+# ! cp kaggle.json ~/.kaggle/
 
 ! chmod 600 ~/.kaggle/kaggle.json
 
 ! kaggle datasets list
+
+!kaggle competitions download -c dstl-satellite-imagery-feature-detection --force
+
+!unzip /content/dstl-satellite-imagery-feature-detection.zip
+
+!unzip three_band.zip
+!rm three_band.zip
+!unzip sixteen_band.zip
+!rm sixteen_band.zip
+!unzip train_wkt_v4.csv.zip
+!rm train_wkt_v4.csv.zip
+!unzip grid_sizes.csv.zip
+!rm grid_sizes.csv.zip
+
+!pip install rasterio
+
+#COPIAR CACHE DE TAMANNOS DE IMAGENES
+!cp /content/drive/MyDrive/grid_sizes.csv .
+!cp /content/drive/MyDrive/3_shapes.csv .
+
+#COPIAR DATASET PREPARADO
+!cp /content/drive/MyDrive/train_16.h5 .
+
+#MODULOS CON CODIGOS AUXILIARES
+!cp /content/drive/MyDrive/extra_functions.py .
+!cp /content/drive/MyDrive/unet_trees.py .
+!cp /content/drive/MyDrive/model_weights_128_50_trees_2_.h5 .
+!cp /content/drive/MyDrive/train_wkt_v4.csv .
+
+#Máscara de ejemplo
+
+!cp /content/drive/MyDrive/predicted_mask .
+!cp /content/drive/MyDrive/predicted_mask_v .
+!cp /content/drive/MyDrive/predicted_mask_h .
+!cp /content/drive/MyDrive/predicted_mask_s .
+!cp /content/drive/MyDrive/new_mask .
+
+!rm unet_trees.py
+!cp /content/drive/MyDrive/unet_trees.py .
+
+import rasterio as rst
+import sys
+sys.path.insert(1, '.')
+from numba import jit
+import shapely
+import shapely.geometry
+import shapely.affinity
+from shapely.geometry import MultiPolygon, Polygon
+import shapely.wkt
+import shapely.affinity
+from google.colab.patches import cv2_imshow
+import tifffile as tiff
+import os
+from tqdm import tqdm
+import pandas as pd
+import h5py
+import extra_functions
+import h5py
+import numpy as np
+import cv2
+# from unet_trees import get_unet0 ,History ,jaccard_coef_loss ,jaccard_coef_int ,batch_generator ,save_model ,save_history
+from keras.optimizers import Nadam
+import datetime
+import matplotlib.pyplot as plt
+
+def save_sizes(data_path):
+  three_band_path = os.path.join(data_path, 'three_band')
+
+  file_names = []
+  widths_3 = []
+  heights_3 = []
+
+
+  for file_name in tqdm(sorted(os.listdir(three_band_path))):
+      # TODO: crashes if there anything except tiff files in folder (for ex, QGIS creates a lot of aux files)
+      image_id = file_name.split('.')[0]
+      image_3 = tiff.imread(os.path.join(three_band_path, file_name))
+
+      file_names += [file_name]
+      _, height_3, width_3 = image_3.shape
+
+      widths_3 += [width_3]
+      heights_3 += [height_3]
+
+  df = pd.DataFrame({'file_name': file_names, 'width': widths_3, 'height': heights_3})
+
+  df['image_id'] = df['file_name'].apply(lambda x: x.split('.')[0])
+
+  df.to_csv(os.path.join('.', '3_shapes.csv'), index=False)
+
+# Preparando timer
+import time
+
+!rm train_16.h5
+
+# Código a medir
+start = time.time()
+
+def cache_train_16(data_path):
+  train_wkt = pd.read_csv(os.path.join(data_path, 'train_wkt_v4.csv'))
+  gs = pd.read_csv(os.path.join(data_path, 'grid_sizes.csv'), names=['ImageId', 'Xmax', 'Ymin'], skiprows=1)
+  shapes = pd.read_csv(os.path.join(data_path, '3_shapes.csv'))
+
+  print('num_train_images =', train_wkt['ImageId'].nunique())
+  train_shapes = shapes[shapes['image_id'].isin(train_wkt['ImageId'].unique())]
+  min_train_height = train_shapes['height'].min()
+  min_train_width = train_shapes['width'].min()
+  num_train = train_shapes.shape[0]
+
+  image_rows = min_train_height
+  image_cols = min_train_width
+
+  num_channels = 16
+  num_mask_channels = 10
+  f = h5py.File(os.path.join(data_path, 'train_16.h5'), 'w')
+  imgs = f.create_dataset('train', (num_train, num_channels, image_rows, image_cols), dtype=np.float16, compression='gzip', compression_opts=9)
+  imgs_mask = f.create_dataset('train_mask', (num_train, num_mask_channels, image_rows, image_cols), dtype=np.uint8, compression='gzip', compression_opts=9)
+  ids = []
+  i = 0
+  for image_id in tqdm(sorted(train_wkt['ImageId'].unique())):
+      image = extra_functions.read_image_16(image_id,data_path)
+      _, height, width = image.shape
+      imgs[i] = image[:, :min_train_height, :min_train_width]
+      imgs_mask[i] = extra_functions.generate_mask(image_id,
+                                                   height,
+                                                   width,
+                                                   num_mask_channels=num_mask_channels,
+                                                   train=train_wkt,gs = gs)[:, :min_train_height, :min_train_width]
+      ids += [image_id]
+      i += 1
+  # fix from there: https://github.com/h5py/h5py/issues/441
+  f['train_ids'] = np.array(ids).astype('|S9')
+  f.close()
+
+cache_train_16('.')
+
+# Cálculo del tiempo de ejecución
+end = time.time()
+duration = end - start
+
+# Impresión del tiempo de ejecución
+print("El código tardó {0:.5f} segundos en ejecutarse".format(duration))
+
+now = datetime.datetime.now()
+print('[{}] Creating and compiling model...'.format(str(datetime.datetime.now())))
+model = get_unet0()
+
+now = datetime.datetime.now()
+data_path = '.'
+print('[{}] Reading train...'.format(str(datetime.datetime.now())))
+f = h5py.File(os.path.join(data_path, 'train_16.h5'), 'r')
+X_train = f['train']
+y_train = np.array(f['train_mask'])[:, 4]
+y_train = np.expand_dims(y_train, 1)
+print(y_train.shape)
+
+train_ids = np.array(f['train_ids'])
+batch_size = 128
+nb_epoch = 50
+history = History()
+callbacks = [
+    history,
+]
+suffix = 'trees_2_'
+model.compile(optimizer=Nadam(lr=1e-2), loss=jaccard_coef_loss, metrics=['binary_crossentropy', jaccard_coef_int])
+model.fit(batch_generator(X_train, y_train, batch_size, horizontal_flip=True, vertical_flip=True, swap_axis=True),
+                    epochs=nb_epoch,
+                    verbose=1,
+                    steps_per_epoch=batch_size * 400,
+                    callbacks=callbacks,
+                    workers=8
+                    )
+save_model(model, "{batch}_{epoch}_{suffix}".format(batch=batch_size, epoch=nb_epoch, suffix=suffix))
+save_history(history, suffix)
+f.close()
+
+model.load_weights(os.path.join('.', 'model_weights_128_50_trees_2_.h5'),by_name = True)
+
+data_path = '.'
+num_channels = 16
+num_mask_channels = 1
+threashold = 0.1
+
+train_wkt = pd.read_csv(os.path.join(data_path, 'train_wkt_v4.csv'))
+gs = pd.read_csv(os.path.join(data_path, 'grid_sizes.csv'), names=['ImageId', 'Xmax', 'Ymin'], skiprows=1)
+shapes = pd.read_csv(os.path.join(data_path, '3_shapes.csv'))
+
+test_ids = shapes.loc[~shapes['image_id'].isin(train_wkt['ImageId'].unique()), 'image_id']
+image_id = test_ids[0]
+
+result = []
+
+
+def flip_axis(x, axis):
+    x = np.asarray(x).swapaxes(axis, 0)
+    x = x[::-1, ...]
+    x = x.swapaxes(0, axis)
+    return x
+
+
+@jit
+def mask2poly(predicted_mask, threashold, x_scaler, y_scaler):
+    polygons = extra_functions.mask2polygons_layer(predicted_mask[0] > threashold, epsilon=0, min_area=10)
+
+    polygons = shapely.affinity.scale(polygons, xfact=1.0 / x_scaler, yfact=1.0 / y_scaler, origin=(0, 0, 0))
+    return shapely.wkt.dumps(polygons)
+
+index = 0
+
+# for index, image_id in tqdm(enumerate(test_ids)):
+image = X_train[index]
+H = image.shape[1]
+W = image.shape[2]
+x_max, y_min = extra_functions._get_xmax_ymin(image_id,gs)
+predicted_mask = extra_functions.make_prediction_cropped(model, image, initial_size=(112, 112),
+                                                         final_size=(112-32, 112-32),
+                                                         num_masks=num_mask_channels, num_channels=num_channels)
+image_v = flip_axis(image, 1)
+predicted_mask_v = extra_functions.make_prediction_cropped(model, image_v, initial_size=(112, 112),
+                                                           final_size=(112 - 32, 112 - 32),
+                                                           num_masks=1,
+                                                           num_channels=num_channels)
+image_h = flip_axis(image, 2)
+predicted_mask_h = extra_functions.make_prediction_cropped(model, image_h, initial_size=(112, 112),
+                                                           final_size=(112 - 32, 112 - 32),
+                                                           num_masks=1,
+                                                           num_channels=num_channels)
+image_s = image.swapaxes(1, 2)
+predicted_mask_s = extra_functions.make_prediction_cropped(model, image_s, initial_size=(112, 112),
+                                                           final_size=(112 - 32, 112 - 32),
+                                                           num_masks=1,
+                                                           num_channels=num_channels)
+new_mask = np.power(predicted_mask *
+                    flip_axis(predicted_mask_v, 1) *
+                    flip_axis(predicted_mask_h, 2) *
+                    predicted_mask_s.swapaxes(1, 2), 0.25)
+x_scaler, y_scaler = extra_functions.get_scalers(H, W, x_max, y_min)
+mask_channel = 4
+result += [(image_id, mask_channel + 1, mask2poly(new_mask, threashold, x_scaler, y_scaler))]
+
+file_predicted_mask = open("predicted_mask", "wb")
+file_predicted_mask_v = open("predicted_mask_v", "wb")
+file_predicted_mask_h = open("predicted_mask_h", "wb")
+file_predicted_mask_s = open("predicted_mask_s", "wb")
+file_new_mask = open("new_mask", "wb")
+# save array to the file
+np.save(file_predicted_mask, predicted_mask)
+np.save(file_predicted_mask_v, predicted_mask_v)
+np.save(file_predicted_mask_h, predicted_mask_h)
+np.save(file_predicted_mask_s, predicted_mask_s)
+np.save(file_new_mask, new_mask)
+# close the file
+file_predicted_mask.close()
+file_predicted_mask_v.close()
+file_predicted_mask_h.close()
+file_predicted_mask_s.close()
+file_new_mask.close()
+
+!cp predicted_mask /content/drive/MyDrive/
+!cp predicted_mask_v /content/drive/MyDrive/
+!cp predicted_mask_h /content/drive/MyDrive/
+!cp predicted_mask_s /content/drive/MyDrive/
+!cp new_mask /content/drive/MyDrive/
+
+predicted_mask = None
+with open('predicted_mask','rb') as predicted_mask_file:
+  predicted_mask = np.load(predicted_mask_file)
+
+predicted_mask_v = None
+with open('predicted_mask_v','rb') as predicted_mask_v_file:
+  predicted_mask_v = np.load(predicted_mask_v_file)
+
+predicted_mask_h = None
+with open('predicted_mask_h','rb') as predicted_mask_h_file:
+  predicted_mask_h = np.load(predicted_mask_h_file)
+
+predicted_mask_s = None
+with open('predicted_mask_s','rb') as predicted_mask_s_file:
+  predicted_mask_s = np.load(predicted_mask_s_file)
+
+new_mask = None
+with open('new_mask','rb') as new_mask_file:
+  new_mask = np.load(new_mask_file)
+
+print(new_mask.max())
+new_mask_bool = new_mask[0] > 0.40
+mask_rgb = np.zeros((*new_mask_bool.shape, 3), dtype=np.uint8)
+mask_rgb[new_mask_bool] = [30, 95, 185]
+mask_rgb = mask_rgb/255
+
+train_wkt = pd.read_csv(os.path.join(data_path, 'train_wkt_v4.csv'))
+gs = pd.read_csv(os.path.join(data_path, 'grid_sizes.csv'), names=['ImageId', 'Xmax', 'Ymin'], skiprows=1)
+shapes = pd.read_csv(os.path.join(data_path, '3_shapes.csv'))
+test_ids = shapes.loc[~shapes['image_id'].isin(train_wkt['ImageId'].unique()), 'image_id']
+image_id = test_ids[0]
+image_id
+
+def CCCscale(x):
+  return (x - np.nanpercentile(x,2))/(np.nanpercentile(x,98) - np.nanpercentile(x,2))
+
+
+with rst.open('/content/three_band/6010_0_0.tif') as src:
+  r = src.read(1)[:3345, :3338]
+  g = src.read(2)[:3345, :3338]
+  b = src.read(3)[:3345, :3338]
+  r_scl = CCCscale(r)
+  g_scl = CCCscale(g)
+  b_scl = CCCscale(b)
+  img = cv2.merge((r_scl,g_scl,b_scl))
+  alpha = 0.5
+  gamma = 0
+  print(img.dtype)
+  print(mask_rgb.dtype)
+  img_result = cv2.addWeighted(img, alpha, mask_rgb, 1 - alpha, gamma)
+  # img = np.dstack((r_scl,g_scl,b_scl))
+  # cv2_imshow(img[100:550,100:550,:])
+  plt.figure()
+  plt.imshow(img_result[100:550,100:550,:])
+  # plt.show()
