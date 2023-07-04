@@ -4,26 +4,7 @@ from keras.optimizers import Adam
 from metrics import jacc_loss, dice_coef, jacc_coef, acc, sensitivity, specificity
 
 ISZ = 160
-CH = 8
-
-
-def get_crop_shape(target, refer):
-    # width, the 3rd dimension
-    cw = (target.get_shape()[2] - refer.get_shape()[2])
-    assert (cw >= 0)
-    if cw % 2 != 0:
-        cw1, cw2 = int(cw/2), int(cw/2) + 1
-    else:
-        cw1, cw2 = int(cw/2), int(cw/2)
-    # height, the 2nd dimension
-    ch = (target.get_shape()[1] - refer.get_shape()[1])
-    assert (ch >= 0)
-    if ch % 2 != 0:
-        ch1, ch2 = int(ch/2), int(ch/2) + 1
-    else:
-        ch1, ch2 = int(ch/2), int(ch/2)
-
-    return (ch1, ch2), (cw1, cw2)
+CH = 3
 
 def get_unet():
     concat_axis = 3
