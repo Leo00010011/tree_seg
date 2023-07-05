@@ -1,7 +1,6 @@
 from keras import Input, Model
 from keras import layers
 from keras.optimizers import Adam
-from metrics import jacc_loss, dice_coef, jacc_coef, acc, sensitivity, specificity
 
 ISZ = 160
 CH = 3
@@ -49,8 +48,6 @@ def get_unet():
 
     model = layers.Conv2D(1, (1,1), activation='sigmoid')(conv9)
     model = Model(inputs=inputs, outputs=model)
-    model.compile(optimizer = Adam(learning_rate=1e-5), loss = 'binary_crossentropy', 
-                  metrics = ['accuracy', acc, jacc_loss, dice_coef, jacc_coef, sensitivity, specificity])
     return model
 
 #model = get_unet()
