@@ -37,6 +37,23 @@ def make_prediction(model,X_train, index_index, x,y):
     mask = model.predict(np.array([ori_img[x:x + 160,y:y + 160,:]]))
     return mask[0,:,:,0]
 
+def plot_img(X_train,img_id,x,y):
+    #fp rojo
+    #fn azul
+
+    #GETTING THE IMAGE FROM DE DATASET
+    img = X_train[img_id]
+    img = img[x:x + 160,y:y + 160,:]
+    img = img.transpose(1,2,0)
+    img = img.astype(np.float32)
+    img *=2047
+    img = CCCscaleImg(img)
+
+    plt.title('Imagen')
+    plt.imshow(img)
+    plt.savefig('fig')
+    plt.show()
+
 def plot_FP_TP(fp_mask,fn_mask,X_train,img_id,x,y):
     #fp rojo
     #fn azul
@@ -73,6 +90,34 @@ def plot_FP_TP(fp_mask,fn_mask,X_train,img_id,x,y):
     plt.subplot2grid(grid_size, (0, 1), rowspan = 1, colspan = 1)
     plt.title('FP(RED)/FN(BLUE)')
     plt.imshow(img_result)
+    plt.savefig('fig')
+    plt.show()
+
+def plot_img_with_mask(X_train,img_id,mask,x,y):
+    #fp rojo
+    #fn azul
+
+    #GETTING THE IMAGE FROM DE DATASET
+    img = X_train[img_id]
+    img = img[x:x + 160,y:y + 160,:]
+    img = img.transpose(1,2,0)
+    img = img.astype(np.float32)
+    img *=2047
+    img = CCCscaleImg(img)
+
+    #CREATING FN RGB BLUE MASK
+    rgb_mask = np.zeros((160,160,3))
+    rgb_mask[:,:,3] = mask
+    rgb_mask = rgb_mask.astype(np.float32)
+
+    #PUTTING THE IN THEMASKING DE IMAGE
+    alpha = 0.5 #TRANSPARENCE
+    gamma = 0  #IDK
+    img_result = cv2.addWeighted(img_result, alpha, rgb_mask, 1 - alpha, gamma)
+    img_result = CCCscaleImg(img_result)
+
+    plt.title('Mask')
+    plt.imshow(img)
     plt.savefig('fig')
     plt.show()
 
