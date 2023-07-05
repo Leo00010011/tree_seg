@@ -5,12 +5,13 @@ import numpy as np
 import os
 from keras.models import load_model
 
+
 def load_dataset(path):
     f = h5py.File(path, 'r')
-    X_train = f['cities_train']
-    y_train = f['cities_train_mask']
-    X_val = f['not_cities_train']
-    y_val = f['not_cities_train_mask']
+    X_train = f['not_cities_train']
+    y_train = f['not_cities_train_mask']
+    X_val = f['cities_train']
+    y_val = f['cities_train_mask']
     train_ids = f['city_ids']
     val_ids = f['not_city_ids']
 
