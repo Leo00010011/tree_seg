@@ -37,9 +37,57 @@ def make_prediction(model,X_train, index_index, x,y):
     mask = model.predict(np.array([ori_img[x:x + 160,y:y + 160,:]]))
     return mask[0,:,:,0]
 
+
+def comp_img_pred(model,X_train,y_train,index,x,y):
+    #PREDICTING MASK
+    img = X_train[index]
+    img = img.transpose(1,2,0)[x:x + 160,y:y + 160,:]
+    pred_mask = model.predict(np.array([img]))
+    
+    #PREPARING THE IMAGE
+    img = img.astype(np.float32)
+    img *=2047
+    img = CCCscaleImg(img)
+
+    #CREATING PREDICTED MASK RGB
+    mask_rgb = np.zeros((160,160,3))
+    mask_rgb[:,:,2] = pred_mask[0,:,:,0]
+    mask_rgb = mask_rgb.astype(np.float32)
+    
+    #PUTTING DE MASK IN THE IMAGE
+    alpha = 0.5
+    gamma = 0
+    img_result = cv2.addWeighted(img, alpha, mask_rgb, 1 - alpha, gamma)
+    img_result = CCCscaleImg(img_result)
+
+    #GETTING REAL MASK
+    real = y_train[0]
+    real = real[x:x + 160,y:y + 160]
+
+    #PUTTING THE REAL MASK IN OTHER IMAGE
+    new_mask_bool = real == 1
+    to_add = np.zeros((*new_mask_bool.shape, 3), dtype=np.uint8)
+    to_add[new_mask_bool] = [30, 95, 185]
+    to_add = to_add/255
+    to_add = to_add.astype(np.float32)
+    real_seg = cv2.addWeighted(img, alpha, to_add, 1 - alpha, gamma)
+    real_seg = CCCscaleImg(real_seg)
+
+    #PLOTING THE IMAGES
+    grid_size = (1, 3)
+    plt.subplot2grid(grid_size, (0, 0), rowspan = 1, colspan = 1)
+    plt.title('Imagen')
+    plt.imshow(img)
+    plt.subplot2grid(grid_size, (0, 1), rowspan = 1, colspan = 1)
+    plt.title('Real')
+    plt.imshow(real_seg)
+    plt.subplot2grid(grid_size, (0, 2), rowspan = 1, colspan = 1)
+    plt.title('Predicción')
+    plt.imshow(img_result)
+    plt.savefig('fig')
+    plt.show()
+
 def plot_img(X_train,img_id,x,y):
-    #fp rojo
-    #fn azul
 
     #GETTING THE IMAGE FROM DE DATASET
     img = X_train[img_id]
