@@ -15,10 +15,10 @@ def load_dataset(path):
     train_ids = f['city_ids']
     val_ids = f['not_city_ids']
 
-    X_train, y_train, train_ids, X_val, y_val, val_ids
+    return X_train, y_train, train_ids, X_val, y_val, val_ids
 
-def create_and_load(model_creator, weights_path):
-    model = model_creator()
+def create_and_load(ch,model_creator, weights_path):
+    model = model_creator(ch)
     model.load_weights(weights_path)
     return model
 
@@ -39,14 +39,18 @@ def make_prediction(model,X_train, index_index, x,y):
     return mask[0,:,:,0]
 
 
-def comp_img_pred(model,X_train,y_train,index,x,y):
+def comp_img_pred(model,X,y_train,index,x,y):
     #PREDICTING MASK
-    img = X_train[index]
-    img = img.transpose(1,2,0)[x:x + 160,y:y + 160,:]
+    img = X[index]
+    img = img.transpose(1,2,0)
+    img = img[x:x + 160,y:y + 160,:]
     pred_mask = model.predict(np.array([img]))
     
     #PREPARING THE IMAGE
     img = img.astype(np.float32)
+    _, _, ch_num = img.shape
+    if ch_num == 4:
+      img = img[:,:,1:]
     img *=2047
     img = CCCscaleImg(img)
 
@@ -62,7 +66,7 @@ def comp_img_pred(model,X_train,y_train,index,x,y):
     img_result = CCCscaleImg(img_result)
 
     #GETTING REAL MASK
-    real = y_train[0]
+    real = y_train[index]
     real = real[x:x + 160,y:y + 160]
 
     #PUTTING THE REAL MASK IN OTHER IMAGE
@@ -92,8 +96,8 @@ def plot_img(X_train,img_id,x,y):
 
     #GETTING THE IMAGE FROM DE DATASET
     img = X_train[img_id]
-    img = img[x:x + 160,y:y + 160,:]
-    img = img.transpose(1,2,0)
+    img = img.transpose((1,2,0))
+    img = img[x:x + 160,y:y + 160,1:]
     img = img.astype(np.float32)
     img *=2047
     img = CCCscaleImg(img)
@@ -109,8 +113,8 @@ def plot_FP_TP(fp_mask,fn_mask,X_train,img_id,x,y):
 
     #GETTING THE IMAGE FROM DE DATASET
     img = X_train[img_id]
-    img = img[x:x + 160,y:y + 160,:]
     img = img.transpose(1,2,0)
+    img = img[x:x + 160,y:y + 160,:]
     img = img.astype(np.float32)
     img *=2047
     img = CCCscaleImg(img)
