@@ -1,8 +1,7 @@
 import math
 import cv2
-from utils import CCCscaleImg
 import numpy as np
-import matplotlib.pyplot as plt
+from utils import CCCscaleImg
 
 def from_dataset_to_collage(img,tile_size):
     img = img.transpose((1,2,0))
@@ -18,24 +17,34 @@ def from_dataset_to_collage(img,tile_size):
     return img
 
 def collage(X):
-  count, _ ,width, size = X.shape
-  size = int(math.sqrt(count))
-  rem = count - size**2
-  h_rem = 1
-  if rem == 0:
-    h_rem == 0
+  count, _ ,hegiht, width = X.shape
+  sq = math.sqrt(count)
+  cols = 0
+  rows = 0
+  count_full = 0
+  if abs(math.ceil(sq)** 2 - count) <= abs(math.floor(sq)** 2 - count):
+    cols = math.ceil(sq)
+    rows = cols
+    count_full = cols*(cols - 1)
+  else:
+    cols = math.floor(sq)
+    rows = cols + 1
+    count_full = cols**2
+
   tile_size = width//4
-  result = np.ones((tile_size*(size + h_rem),tile_size*size,3))*255
-  for index in range(size**2):
+  result = np.ones((tile_size*rows,tile_size*cols,3))*255
+  for index in range(count_full):
     img = X[index]
     img = from_dataset_to_collage(img,tile_size)
-    result[(index % size)*tile_size:(index % size)*tile_size + tile_size,(index//size)*tile_size:(index//size)*tile_size + tile_size,:] = img
-  if rem != 0:
-    pad = int((size - rem)*tile_size/2)
+    result[(index//cols)*tile_size:(index//cols + 1)*tile_size,(index%cols)*tile_size:(index%cols + 1)*tile_size,:] = img
+
+  if count_full != count:
+    rem = count - count_full
+    pad = (cols - rem)*tile_size//2
     for index in range(rem):
-      img = X[size**2 + index]
+      img = X[count_full + index]
       img = from_dataset_to_collage(img,tile_size)
-      result[(size)*tile_size: ,pad + index*tile_size:pad + index*tile_size + tile_size,:] = img
+      result[(count_full//cols)*tile_size: ,pad + index*tile_size:pad + (index + 1)*tile_size,:] = img
   return result
 
 def from_dataset_to_collage_masked(img,mask,tile_size):
@@ -69,36 +78,46 @@ def from_dataset_to_collage_masked(img,mask,tile_size):
 
 
 def collage_masked(X,y):
-  count, _ ,width, size = X.shape
-  size = int(math.sqrt(count))
-  rem = count - size**2
-  h_rem = 1
-  if rem == 0:
-    h_rem == 0
+  count, _ ,hegiht, width = X.shape
+  sq = math.sqrt(count)
+  cols = 0
+  rows = 0
+  count_full = 0
+  if abs(math.ceil(sq)** 2 - count) <= abs(math.floor(sq)** 2 - count):
+    cols = math.ceil(sq)
+    rows = cols
+    count_full = cols*(cols - 1)
+  else:
+    cols = math.floor(sq)
+    rows = cols + 1
+    count_full = cols**2
+
   tile_size = width//4
-  result = np.ones((tile_size*(size + h_rem),tile_size*size,3))*255
-  for index in range(size**2):
+  result = np.ones((tile_size*rows,tile_size*cols,3))*255
+  for index in range(count_full):
     img = X[index]
     mask = y[index]
     img = from_dataset_to_collage_masked(img,mask,tile_size)
-    result[(index % size)*tile_size:(index % size)*tile_size + tile_size,(index//size)*tile_size:(index//size)*tile_size + tile_size,:] = img
-  if rem != 0:
-    pad = int((size - rem)*tile_size/2)
+    result[(index//cols)*tile_size:(index//cols + 1)*tile_size,(index%cols)*tile_size:(index%cols + 1)*tile_size,:] = img
+
+  if count_full != count:
+    rem = count - count_full
+    pad = (cols - rem)*tile_size//2
     for index in range(rem):
-      dat_index = size**2 + index
-      img = X[dat_index]
-      mask = y[dat_index]
+      img = X[count_full + index]
+      mask = y[count_full + index]
       img = from_dataset_to_collage_masked(img,mask,tile_size)
-      result[(size)*tile_size: ,pad + index*tile_size:pad + index*tile_size + tile_size,:] = img
+      result[(count_full//cols)*tile_size: ,pad + index*tile_size:pad + (index + 1)*tile_size,:] = img
   return result
 
 def save_collage(result, name):
   height, width, _ = result.shape
   cv2.imwrite(f'{name}_1.png',result)
+
   comp = cv2.resize(result,(height//2,width//2))
-  cv2.imwrite(f'{name}_2.png',result)
+  cv2.imwrite(f'{name}_2.png',comp)
   comp = cv2.resize(result,(height//4,width//4))
-  cv2.imwrite(f'{name}_4.png',result)
+  cv2.imwrite(f'{name}_4.png',comp)
 
 def save_collage_big(result, name):
   height, width, _ = result.shape
