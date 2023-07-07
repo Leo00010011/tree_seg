@@ -15,13 +15,13 @@ def dice_coef(y_true, y_pred, smooth = smooth_default, per_batch = True):
         y_pred_f = K.flatten(y_pred)
         intersection = K.sum(y_true_f * y_pred_f)
         return (2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
-    else: 
+    else:
         y_true_f = K.batch_flatten(y_true)
         y_pred_f = K.batch_flatten(y_pred)
         intersec = 2. * K.sum(y_true_f * y_pred_f, axis=1, keepdims=True) + smooth
         union = K.sum(y_true_f, axis=1, keepdims=True) + K.sum(y_pred_f, axis=1, keepdims=True) + smooth
         return K.mean(intersec / union)
-    
+
 def jacc_loss(y_true, y_pred):
     return 1.0 - jacc_coef(y_true, y_pred)
 
