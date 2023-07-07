@@ -1,3 +1,4 @@
+from typing import List, Tuple
 import shapely
 import shapely.geometry
 import shapely.affinity
@@ -8,9 +9,9 @@ import os
 
 
 # data_path = '../data'
-# train_wkt = pd.read_csv(os.path.join(data_path, 'train_wkt_v4.csv'))
+train_wkt = pd.read_csv('tree_seg/train_wkt_v4.csv')
 
-gs = pd.read_csv('tree_seg\grid_sizes.csv', names=[
+gs = pd.read_csv('tree_seg/grid_sizes.csv', names=[
                  'ImageId', 'Xmax', 'Ymin'], skiprows=1)
 
 
@@ -27,9 +28,14 @@ def mask_polygon(height, width, poly):
 
     cv2.fillPoly(img_mask, exteriors, 1)
     cv2.fillPoly(img_mask, interiors, 0)
-    
-    return img_mask
 
+    coord_1: List[Tuple[int, int]] = []
+    for i in range(height):
+        for j in range(width):
+            if img_mask[i][j] == 1:
+                coord_1.append((i, j))
+        
+    return img_mask, len(coord_1)
 
 def polygons2mask_layer(height, width, polygons, image_id):
     x_max, y_min = _get_xmax_ymin(image_id)
@@ -42,9 +48,12 @@ def polygons2mask_layer(height, width, polygons, image_id):
         return  []
 
     img_mask_polygon = []
+    area_polygon = []
 
     for poly in polygons:
-        img_mask_polygon.append(mask_polygon(height, width, poly))
+        im_msk, coord = mask_polygon(height, width, poly)
+        img_mask_polygon.append(im_msk)
+        area_polygon.append(coord)
 
     return img_mask_polygon
 
@@ -58,4 +67,3 @@ def get_scalers(height, width, x_max, y_min):
     w_ = width * (width / (width + 1))
     h_ = height * (height / (height + 1))
     return w_ / x_max, h_ / y_min
-
