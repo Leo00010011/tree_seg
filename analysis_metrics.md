@@ -1,3 +1,7 @@
+### Métricas de entrenamiento
+
+#### Modelo entrenado con RGB con crossentropy (New RGB)
+
 Las métricas de pérdida (loss) y precisión (accuracy) son las métricas más conocidas y utilizadas para evaluar modelo.
 
 loss: mide la diferencia entre la segmentación predicha por el modelo y la segmentación real. Un valor bajo de loss indica que la predicción del modelo es cercana a la segmentación real.
@@ -22,12 +26,13 @@ Aquí se aprecia que sus valores en comparación con los de accuracy son practic
 
 Es importante analizar la binary accuracy en conjunto con otras métricas, como la sensibilidad (recall) y la especificidad (specificity), para evaluar el rendimiento del modelo en la segmentación de árboles. 
 
-La sensibilidad mide la capacidad del modelo para detectar los píxeles que pertenecen a un árbol.
+La sensibilidad mide la capacidad del modelo para detectar los píxeles que pertenecen a un árbol. Los verdaderos positivos.
 
 ![](./metrics/sensitivity.png)
 
 
-La especificidad mide la capacidad del modelo para detectar los píxeles que no pertenecen a un árbol.
+
+La especificidad mide la capacidad del modelo para detectar los píxeles que no pertenecen a un árbol. Los verdaderos negativos.
 
 ![](./metrics/specificity.png)
 
@@ -53,4 +58,65 @@ El modelo tiene un valor alto en la métrica de pérdida Jaccard Loss y un valor
 
 Pero se puede apreciar que a partir de 60 epochs se ve un significativo aumento de jacc-coef y disminución de jacc-loss lo que indica que va mejorando el aprendizaje del modelo, por lo que es probable que con más epoch se mejore esta métrica, al igual que si se contara con un mayor conjunto de entrenamiento.
 
-Aunque la mayoría de estas métricas son desfavorables pero dice-coef y jacc-coef que son métricas bastante similares indican que el modelo puede ser mejorado ejecutando más epoch o contando con un mayor conjunto de entrenamiento.
+Aunque la mayoría de estas métricas son desfavorables pero dice-coef y jacc-coef que son métricas bastante similares indican que el modelo puede ser mejorado ejecutando más epoch o contando con un mayor conjunto de datos de entrenamiento.
+
+
+
+<!-- #### Modelo entrenado con RGB con crossentropy (New RGB)
+![](./metrics/Metrics_New_RGB/loss-accuracy.png)
+Semejante comportamiento al modelo anterior.
+![](./metrics/Metrics_New_RGB/binary_accuracy.png)
+Semejante comportamiento al modelo anterior.
+![](./metrics/Metrics_New_RGB/sensitivity.png)
+![](./metrics/Metrics_New_RGB/specificity.png)
+![](./metrics/Metrics_New_RGB/dice_coef.png)
+![](./metrics/Metrics_New_RGB/jacc.png) -->
+
+
+
+#### Modelo entrenado con RGB y Nir con crossentropy (New Nir)
+![](./metrics/Metrics_New_Nir/loss-accuracy.png)
+![](./metrics/Metrics_New_Nir/binary_accuracy.png)
+![](./metrics/Metrics_New_Nir/sensitivity.png)
+![](./metrics/Metrics_New_Nir/specificity.png)
+![](./metrics/Metrics_New_Nir/dice_coef.png)
+![](./metrics/Metrics_New_Nir/jacc.png)
+
+En este caso las métricas tienen un compoortamiento similar al modelo anterior, pero se puede ver que los resultados obtenidos son mejores, esto se nota en la gráfica de especificidad (specificity) porque en el modelo anterior se encontraba en 0 y en este se encuentra en 1 lo que significa que el modelo es bueno para identificar los verdaderos negativos pero no tan bueno para identificar los verdderos positivos. Igualmente se obtienen mejores valores en los coeficientes de dice y de jaccard, demostrando que es importante tener en cuenta las bandas nir a la hora de segmentar árboles.
+
+
+
+#### Modelo entrenado con RGB con jacc (First Jacc)
+![](./metrics/Metrics_First_Jacc/loss-accuracy.png)
+![](./metrics/Metrics_First_Jacc/binary_accuracy.png)
+![](./metrics/Metrics_First_Jacc/sensitivity.png)
+![](./metrics/Metrics_First_Jacc/specificity.png)
+![](./metrics/Metrics_First_Jacc/dice_coef.png)
+![](./metrics/Metrics_First_Jacc/jacc.png)
+
+Este modelo obtiene valores muy desfavorables para todas las métricas excepto ppara la sensibilidad, esto se puede deber a que hace predicciones con gran error y que este error está en los pixeles que no pertenecen a árboles, dando una gran cantidad de falsos positivos.
+
+#### Modelo entrenado con RGB y Nir con jacc modificado (New Jacc)
+
+![](./metrics/Metrics_New_Jacc/loss-accuracy.png)
+![](./metrics/Metrics_New_Jacc/binary_accuracy.png)
+![](./metrics/Metrics_New_Jacc/sensitivity.png)
+![](./metrics/Metrics_New_Jacc/specificity.png)
+![](./metrics/Metrics_New_Jacc/dice_coef.png)
+![](./metrics/Metrics_New_Jacc/jacc.png)
+
+Este modelo obtiene bajos valores de loss y altos valores de accurracy y binary accuracy, también obtienen muy buenos valores de sensibilidad y especificidad, por lo que estamos en presencia del mejor modelo hasta el momento, los coeficientes de dice y de jacc dan valores similarea a los anteriores, que aunque no son los mejores tampoco se puede decir que sean malos. 
+
+#### Modelo entrenado con RGB con jacc modificado (New Jacc Nir)
+
+![](./metrics/Metrics_New_Jacc_Nir/loss-accuracy.png)
+![](./metrics/Metrics_New_Jacc_Nir/binary_accuracy.png)
+![](./metrics/Metrics_New_Jacc_Nir/sensitivity.png)
+![](./metrics/Metrics_New_Jacc_Nir/specificity.png)
+![](./metrics/Metrics_New_Jacc_Nir/dice_coef.png)
+![](./metrics/Metrics_New_Jacc_Nir/jacc.png)
+
+Este modeo vuelve a tener una mala evaluación, tiene un loss alto y el accuracy aunque no es malo va disminuyendo con el paso de los epoch 
+al igual que ocurre con casi todas las métricas, mantiene buena sensibilidad y el coeficiente de jaccard aunque no disminuye mantiene valores muy bajos, este modelo tampoco obtuvo buenos resultados.
+
+
