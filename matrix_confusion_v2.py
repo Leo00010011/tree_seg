@@ -66,6 +66,23 @@ def plot_scores(model_names, precision_scores, recall_scores, f1_scores):
     # Mostrar la figura
     plt.show()
 
+def plot_scores_for_n_cm(cm_all):
+  # test = ["rgb", "nir", "3","4","5","6","7","8"]
+  names, precisions, recalls, f1_scores = [], [], [], []
+  for index, confusion_matrix_s in enumerate(cm_all):
+    
+    precision, recall, f1_score = calculate_metrics(confusion_matrix_s)
+    names.append(index)
+    precisions.append(precision)
+    recalls.append(recall)
+    f1_scores.append(f1_score)
+
+  # print("Precision:", precision)
+  # print("Recall:", recall)
+  # print("F1-score:", f1_score)
+
+  plot_scores(names, precisions, recalls, f1_scores)
+
 # Create example confusion matrix
 confusion_matrix = np.array([[80, 20], [30, 70]])
 
