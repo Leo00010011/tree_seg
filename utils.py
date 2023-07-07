@@ -39,12 +39,13 @@ def make_prediction(model,X_train, index_index, x,y):
     return mask[0,:,:,0]
 
 
-def comp_img_pred(model,X,y_train,index,x,y):
+
+def comp_img_pred(model,X,y_train,index,x,y,umbral = 0):
     #PREDICTING MASK
     img = X[index]
     img = img.transpose(1,2,0)
     img = img[x:x + 160,y:y + 160,:]
-    pred_mask = model.predict(np.array([img]))
+    pred_mask = model.predict(np.array([img]))[0,:,:,0]
     
     #PREPARING THE IMAGE
     img = img.astype(np.float32)
@@ -54,15 +55,16 @@ def comp_img_pred(model,X,y_train,index,x,y):
     img *=2047
     img = CCCscaleImg(img)
 
-    #CREATING PREDICTED MASK RGB
-    mask_rgb = np.zeros((160,160,3))
-    mask_rgb[:,:,2] = pred_mask[0,:,:,0]
-    mask_rgb = mask_rgb.astype(np.float32)
-    
+
     #PUTTING DE MASK IN THE IMAGE
     alpha = 0.5
     gamma = 0
-    img_result = cv2.addWeighted(img, alpha, mask_rgb, 1 - alpha, gamma)
+    new_mask_bool = pred_mask > umbral
+    to_add = np.zeros((*new_mask_bool.shape, 3), dtype=np.uint8)
+    to_add[new_mask_bool] = [30, 95, 185]
+    to_add = to_add/255
+    to_add = to_add.astype(np.float32)
+    img_result = cv2.addWeighted(img, alpha, to_add, 1 - alpha, gamma)
     img_result = CCCscaleImg(img_result)
 
     #GETTING REAL MASK
