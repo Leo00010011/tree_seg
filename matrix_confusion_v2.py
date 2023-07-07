@@ -30,3 +30,5 @@ def confusion_matrix_s(predictions:list,reals:list):
     if len(reals[i])== len(predictions[i]):
       confusion_matrixs.append(confusion_matrix(y_true=reals[i], y_pred= predictions[i]))
   return confusion_matrixs
+
+
