@@ -162,70 +162,11 @@ def create_and_load(model_creator, weights_path):
     model.load_weights(weights_path)
     return model
 
-def CCCscale(x):
-  return (x - np.nanpercentile(x,2))/(np.nanpercentile(x,98) - np.nanpercentile(x,2))
-
-def CCCscaleImg(img):
-    img[:,:,0] = CCCscale(img[:,:,0])
-    img[:,:,1] = CCCscale(img[:,:,1])
-    img[:,:,2] = CCCscale(img[:,:,2])
-    return img
-
 def make_prediction(model,X_train, index_index, x,y):
     ori_img = X_train[index_index]
     ori_img = ori_img.transpose(1,2,0)
     mask = model.predict(np.array([ori_img[x:x + 160,y:y + 160,:]]))
     return mask[0,:,:,0]
-
-
-def comp_img_pred(model,X_train,y_train,index,x,y):
-    #PREDICTING MASK
-    img = X_train[index]
-    img = img.transpose(1,2,0)[x:x + 160,y:y + 160,:]
-    pred_mask = model.predict(np.array([img]))
-
-    #PREPARING THE IMAGE
-    img = img.astype(np.float32)
-    img *=2047
-    img = CCCscaleImg(img)
-
-    #CREATING PREDICTED MASK RGB
-    mask_rgb = np.zeros((160,160,3))
-    mask_rgb[:,:,2] = pred_mask[0,:,:,0]
-    mask_rgb = mask_rgb.astype(np.float32)
-
-    #PUTTING DE MASK IN THE IMAGE
-    alpha = 0.5
-    gamma = 0
-    img_result = cv2.addWeighted(img, alpha, mask_rgb, 1 - alpha, gamma)
-    img_result = CCCscaleImg(img_result)
-
-    #GETTING REAL MASK
-    real = y_train[index]#####################################
-    real = real[x:x + 160,y:y + 160]
-
-    #PUTTING THE REAL MASK IN OTHER IMAGE
-    new_mask_bool = real == 1
-    to_add = np.zeros((*new_mask_bool.shape, 3), dtype=np.uint8)
-    to_add[new_mask_bool] = [30, 95, 185]
-    to_add = to_add/255
-    to_add = to_add.astype(np.float32)
-    real_seg = cv2.addWeighted(img, alpha, to_add, 1 - alpha, gamma)
-    real_seg = CCCscaleImg(real_seg)
-
-    #PLOTING THE IMAGES
-    grid_size = (1, 3)
-    plt.subplot2grid(grid_size, (0, 0), rowspan = 1, colspan = 1)
-    plt.title('Imagen')
-    plt.imshow(img)
-    plt.subplot2grid(grid_size, (0, 1), rowspan = 1, colspan = 1)
-    plt.title('Real')
-    plt.imshow(real_seg)
-    plt.subplot2grid(grid_size, (0, 2), rowspan = 1, colspan = 1)
-    plt.title('Predicción')
-    plt.imshow(img_result)
-    plt.savefig('fig')
-    plt.show()
 
 X_train, y_train, train_ids, X_val, y_val, val_ids = load_dataset('/content/drive/MyDrive/splited_train_rgb.h5')
 model = create_and_load(get_unet, '/content/drive/MyDrive/last_weight.hdf5')
@@ -239,61 +180,6 @@ def get_mask(y_train,index,x,y):
   real = y_train[index]#####################################
   real = real[x:x + 160,y:y + 160]
   return real
-
-def plot_FP_FN(fp_mask,fn_mask,X_train,img_id,x,y):
-  #fp rojo
-  #fn azul
-    #PREDICTING MASK
-  i,j=fp_mask.shape #####################3
-
-  img = X_train[img_id]
-  img = img.transpose(1,2,0)[x:x + i,y:y + j,:]
-
-  #PREPARING THE IMAGE
-  img = img.astype(np.float32)
-  img *=2047
-  img = CCCscaleImg(img)
-
-  #CREATING FP RGB RED MASK
-  rgb_fp = np.zeros((i,j,3))
-  rgb_fp[:,:,0] = fp_mask
-  rgb_fp = rgb_fp.astype(np.float32)
-
-  #CREATING FN RGB BLUE MASK
-  # rgb_fn = np.zeros((160,160,3))
-  rgb_fn = np.zeros((i,j,3))
-  rgb_fn[:,:,2] = fn_mask#####################################3 por 2
-  rgb_fn = rgb_fn.astype(np.float32)
-
-  #PUTTING THE IN THEMASKING DE IMAGE
-  alpha = 0.5 #TRANSPARENCE
-  gamma = 0  #IDK
-  img_result = cv2.addWeighted(img, alpha, rgb_fp, 1 - alpha, gamma)
-  img_result = cv2.addWeighted(img_result, alpha, rgb_fn, 1 - alpha, gamma)
-  img_result = CCCscaleImg(img_result)
-
-  grid_size = (1, 2)
-  plt.subplot2grid(grid_size, (0, 0), rowspan = 1, colspan = 1)
-  plt.title('Imagen')
-  plt.imshow(img)
-  plt.subplot2grid(grid_size, (0, 1), rowspan = 1, colspan = 1)
-  plt.title('FP(RED)/FN(BLUE)')
-  plt.imshow(img_result)
-  plt.savefig('fig')
-  plt.show()
-
-
-
-def save_json(data,name):
-  for i in data.keys():
-    # fp_fn[i]={}
-    for x in data[i].keys():
-      # fp_fn[i][x]={}
-      for y in data[i][x].keys():
-        data[i][x][y] = data[i][x][y].tolist()
-
-  with open(f'{name}.json', 'w') as f:
-    json.dump(data, f)
 
 def get_all_predictions(model,X_train,y_train):
   l1, l2, l3, l4 = X_train.shape
@@ -339,45 +225,19 @@ def get_all_predictions(model,X_train,y_train):
 
 """Las predicciones se guardan en un diccionario que tiene como primera llave `img_id` o lo que sería la imagen actual, este valor es nuevamente un diccionario que tiene como llave la coordenada `x` del punto `x_0` en el que se comienza este fragmento de la imagen y este igualmente tiene como valor un diccionario cuya llave es la coordenada `y` del punto `y_0` en el que se comienza este fragmento de la imagen, para finalmente obtener la máscara de la predicción de la imagen `img_id` que comienza en `(x_0,y_0)`"""
 
-def get_predictions_mask_for_one_image(model, img_id:int,pred:dict):
-  join_all = np.zeros((,))
-  for i in predictions_cities_train.keys():
-    for x in predictions_cities_train[i].keys():
-      for y in predictions_cities_train[i][x].keys():
-
 predictions_cities_train = get_all_predictions(model,X_train,y_train)
 
-# save_json(predictions_cities_train,"predictions_cities_train")
-
 predictions_not_cities_val = get_all_predictions(model,X_val,y_val)
-# save_json(predictions_not_cities_val,"predictions_not_cities_val")
 
 !pip install -U scikit-learn
 
 from sklearn.metrics import confusion_matrix
 
 
-
-# def preprocess_predictions(predictions:list,threshold:int = 0.5):
-#   pred=[]
-#   for i in range(len(predictions)):
-#     predictions[i] = predictions[i].flatten().tolist()
-#     for j in range(len(predictions[i])):
-#       predictions[i][j] = 1 if predictions[i][j] >= threshold else 0
-#   return predictions
-
-# def preprocess_reals(reals:list):
-#   reals_new=[]
-#   for i in range(len(reals)):
-#     reals_new.append(reals[i].flatten().tolist())
-#   return reals_new
-
-
 def bit_matrix(pred, threshold = 0.5):
   r,c=pred.shape
   for i in range(r):
     for j in range(c):
-      # print(i,j)
       pred[i][j]=1 if pred[i][j] >= threshold else 0
   return pred
 
@@ -387,9 +247,6 @@ def confusion_matrix_s(predictions:list,reals:list):
   for i in range(len(predictions)):
     if len(reals[i])== len(predictions[i]):
       confusion_matrixs.append(confusion_matrix(y_true=reals[i], y_pred= predictions[i]))
-    # else:
-    #   predictions.pop(i)
-    #   reals.pop(i)
   return confusion_matrixs
 
 predictions = []
@@ -400,8 +257,6 @@ for i in predictions_cities_train.keys():
       predictions.append(bit_matrix(predictions_cities_train[i][x][y], 0.3).flatten().tolist())
       reals.append(get_mask(y_train,i,x,y).flatten().tolist())
 
-# print(predictions)
-
 cm = confusion_matrix_s(predictions,reals)
 cmm = np.zeros((2,2))
 
@@ -409,32 +264,107 @@ for i in cm:
   cmm += i
 cmm = [cmm]
 
+"""#### Metodo para crear una mascara con todas las predicciones de una misma imagen"""
+
+X=3345
+Y=3338
+
+def get_predictions_mask_for_one_image(model, i:int,pred:dict):
+  join_all = np.zeros((X,Y))
+
+  for x in pred[i].keys():
+    for y in pred[i][x].keys():
+      r,c=pred[i][x][y].shape
+      for v in range(r):
+        for w in range(c):
+          join_all[v+x][w+y] = pred[i][x][y][v][w]
+  return join_all
+
+p = get_predictions_mask_for_one_image(model, i=0,pred=predictions_cities_train)
+
+print(p.shape,p)
+
+r= y_train[0]
+p = [bit_matrix(p, 0.3).flatten().tolist()]
+r = [r.flatten().tolist()]
+
+cm_all = confusion_matrix_s(p,r)
+
 # Esta es mia
 from sklearn.metrics import ConfusionMatrixDisplay
 
-def display_confusion_matrix_s(confusion_matrixs:list):
-  for confusion_matrix_s in confusion_matrixs:
-    confusionMatrixDisplay = ConfusionMatrixDisplay(
-        confusion_matrix = confusion_matrix_s
-    )
+for confusion_matrix_s in cm:
+  confusionMatrixDisplay = ConfusionMatrixDisplay(
+      confusion_matrix = confusion_matrix_s
+  )
 
-    confusionMatrixDisplay.plot(cmap="Blues")
+  confusionMatrixDisplay.plot(cmap="Blues")
+  plt.show()
+
+for confusion_matrix_s in cmm:
+  confusionMatrixDisplay = ConfusionMatrixDisplay(
+      confusion_matrix = confusion_matrix_s
+  )
+
+  confusionMatrixDisplay.plot(cmap="Blues")
+  plt.show()
+
+for confusion_matrix_s in cm_all:
+  confusionMatrixDisplay = ConfusionMatrixDisplay(
+      confusion_matrix = confusion_matrix_s
+  )
+
+  confusionMatrixDisplay.plot(cmap="Blues")
+  plt.show()
+
+def calculate_metrics(confusion_matrix):
+    # Calculate precision, recall, and F1-score from the confusion matrix
+    tp = confusion_matrix[1,1]
+    fp = confusion_matrix[0,1]
+    tn = confusion_matrix[0,0]
+    fn = confusion_matrix[1,0]
+
+    precision = tp / (tp + fp)
+    recall = tp / (tp + fn)
+    f1_score = 2 * precision * recall / (precision + recall)
+
+    return precision, recall, f1_score
+
+def plot_scores(model_names, precision_scores, recall_scores, f1_scores):
+    # Crear figura y ejes
+    fig, ax = plt.subplots()
+
+    # Crear barras para las medidas de precisión, recobrado y F1-score
+    bar_width = 0.25
+    bar_positions = np.arange(len(model_names))
+    ax.bar(bar_positions, precision_scores, width=bar_width, label='Precisión')
+    ax.bar(bar_positions + bar_width, recall_scores, width=bar_width, label='Recobrado')
+    ax.bar(bar_positions + 2*bar_width, f1_scores, width=bar_width, label='F1-score')
+
+    # Añadir etiquetas de modelo y leyenda
+    ax.set_xticks(bar_positions + bar_width)
+    ax.set_xticklabels(model_names)
+    ax.legend()
+
+    # Mostrar la figura
     plt.show()
 
-display_confusion_matrix_s(cm)
+cm_all[0][0,1]
 
-def display_confusion_matrix_s_full(confusion_matrixs:list):
-  cmm = np.zeros((2,2))
+for confusion_matrix_s in cm_all:
+  precision, recall, f1_score = calculate_metrics(confusion_matrix_s)
 
-  for i in confusion_matrixs:
-    cmm += i
-  cmm = [cmm]
-  for confusion_matrix_s in cmm:
-    confusionMatrixDisplay = ConfusionMatrixDisplay(
-        confusion_matrix = confusion_matrix_s
-    )
 
-    confusionMatrixDisplay.plot(cmap="Blues")
-    plt.show()
+  print("Precision:", precision)
+  print("Recall:", recall)
+  print("F1-score:", f1_score)
+  plot_scores(["rgb"], [precision], [recall], [f1_score])
 
-display_confusion_matrix_s_full(cm)
+# # Crear datos de ejemplo para los modelos
+# model_names = ['Modelo A', 'Modelo B', 'Modelo C']
+# precision_scores = [0.8, 0.7, 0.9]
+# recall_scores = [0.7, 0.8, 0.6]
+# f1_scores = [0.75, 0.75, 0.75]
+
+# # Graficar las medidas para los modelos utilizando el método plot_scores
+# plot_scores(model_names, precision_scores, recall_scores, f1_scores)
